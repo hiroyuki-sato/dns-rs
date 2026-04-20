@@ -93,10 +93,10 @@ impl DnsMessage {
         let mut reader = wire::Reader::new(buf);
 
         let header = Header::decode(&mut reader)?;
-        let questions = Self::decode_questions(&mut reader, buf, header.qdcount)?;
-        let answers = Self::decode_resource_records(&mut reader, buf, header.ancount)?;
-        let authorities = Self::decode_resource_records(&mut reader, buf, header.nscount)?;
-        let additionals = Self::decode_resource_records(&mut reader, buf, header.arcount)?;
+        let questions = Self::decode_questions(&mut reader, header.qdcount)?;
+        let answers = Self::decode_resource_records(&mut reader, header.ancount)?;
+        let authorities = Self::decode_resource_records(&mut reader, header.nscount)?;
+        let additionals = Self::decode_resource_records(&mut reader, header.arcount)?;
 
         Ok(Self {
             header,
@@ -109,14 +109,13 @@ impl DnsMessage {
 
     fn decode_questions(
         reader: &mut wire::Reader<'_>,
-        buf: &[u8],
         qdcount: u16,
     ) -> Result<Vec<Question>, DnsError> {
         let mut questions = Vec::with_capacity(qdcount as usize);
 
         // Read exactly qdcount question entries from the current reader position.
         for _ in 0..qdcount {
-            let question = Question::decode(reader, buf)?;
+            let question = Question::decode(reader)?;
             questions.push(question);
         }
 
@@ -125,24 +124,20 @@ impl DnsMessage {
 
     fn decode_resource_records(
         reader: &mut wire::Reader<'_>,
-        buf: &[u8],
         count: u16,
     ) -> Result<Vec<ResourceRecord>, DnsError> {
         let mut records = Vec::with_capacity(count as usize);
 
         // Read exactly `count` resource records from the current reader position.
         for _ in 0..count {
-            records.push(Self::decode_resource_record(reader, buf)?);
+            records.push(Self::decode_resource_record(reader)?);
         }
 
         Ok(records)
     }
 
-    fn decode_resource_record(
-        reader: &mut wire::Reader<'_>,
-        buf: &[u8],
-    ) -> Result<ResourceRecord, DnsError> {
-        ResourceRecord::decode(reader, buf)
+    fn decode_resource_record(reader: &mut wire::Reader<'_>) -> Result<ResourceRecord, DnsError> {
+        ResourceRecord::decode(reader)
     }
 }
 
@@ -246,7 +241,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let questions = DnsMessage::decode_questions(&mut reader, &buf, 2).unwrap();
+        let questions = DnsMessage::decode_questions(&mut reader, 2).unwrap();
 
         assert_eq!(
             questions,
@@ -282,7 +277,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -309,7 +304,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -338,7 +333,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -367,7 +362,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -396,7 +391,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -427,7 +422,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -467,7 +462,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -506,7 +501,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -535,7 +530,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let rr = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap();
+        let rr = DnsMessage::decode_resource_record(&mut reader).unwrap();
 
         assert_eq!(
             rr,
@@ -562,7 +557,7 @@ mod tests {
 
         let mut reader = wire::Reader::new(&buf);
 
-        let err = DnsMessage::decode_resource_record(&mut reader, &buf).unwrap_err();
+        let err = DnsMessage::decode_resource_record(&mut reader).unwrap_err();
 
         assert_eq!(
             err,

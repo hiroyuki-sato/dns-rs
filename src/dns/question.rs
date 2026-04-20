@@ -11,9 +11,9 @@ pub struct Question {
 }
 
 impl Question {
-    pub fn decode(reader: &mut wire::Reader, buf: &[u8]) -> Result<Self, DnsError> {
+    pub fn decode(reader: &mut wire::Reader) -> Result<Self, DnsError> {
         // QNAME is a DNS name in wire format.
-        let qname = decode_name(reader, buf)?;
+        let qname = decode_name(reader)?;
 
         // QTYPE and QCLASS are fixed-width fields after QNAME.
         let qtype = DnsType::from(reader.read_u16_be()?);

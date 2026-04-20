@@ -10,6 +10,10 @@ impl<'a> Reader<'a> {
         Self { buf, pos: 0 }
     }
 
+    pub fn at(buf: &'a [u8], pos: usize) -> Self {
+        Self { buf, pos }
+    }
+
     pub fn position(&self) -> usize {
         self.pos
     }
@@ -69,6 +73,10 @@ impl<'a> Reader<'a> {
     }
     pub fn read_slice(&mut self, n: usize) -> Result<&'a [u8], Error> {
         self.take(n)
+    }
+
+    pub fn buf(&self) -> &'a [u8] {
+        self.buf
     }
 }
 

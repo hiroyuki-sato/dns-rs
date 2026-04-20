@@ -13,9 +13,9 @@ pub struct ResourceRecord {
 }
 
 impl ResourceRecord {
-    pub fn decode(reader: &mut wire::Reader, buf: &[u8]) -> Result<Self, DnsError> {
+    pub fn decode(reader: &mut wire::Reader) -> Result<Self, DnsError> {
         // RR NAME may be compressed.
-        let name = decode_name(reader, buf)?;
+        let name = decode_name(reader)?;
 
         // Fixed RR header fields.
         let rrtype = DnsType::from(reader.read_u16_be()?);
@@ -48,17 +48,17 @@ impl ResourceRecord {
             }
 
             DnsType::CNAME => {
-                let cname = Self::decode_name_rdata(reader, buf, rdlength)?;
+                let cname = Self::decode_name_rdata(reader, rdlength)?;
                 RData::CNAME(cname)
             }
 
             DnsType::NS => {
-                let ns = Self::decode_name_rdata(reader, buf, rdlength)?;
+                let ns = Self::decode_name_rdata(reader, rdlength)?;
                 RData::NS(ns)
             }
 
             DnsType::PTR => {
-                let ptr = Self::decode_name_rdata(reader, buf, rdlength)?;
+                let ptr = Self::decode_name_rdata(reader, rdlength)?;
                 RData::PTR(ptr)
             }
 
@@ -66,7 +66,7 @@ impl ResourceRecord {
                 let start = reader.position();
 
                 let preference = reader.read_u16_be()?;
-                let exchange = decode_name(reader, buf)?;
+                let exchange = decode_name(reader)?;
 
                 let consumed = reader.position() - start;
                 if consumed != rdlength {
@@ -85,8 +85,8 @@ impl ResourceRecord {
             DnsType::SOA => {
                 let start = reader.position();
 
-                let mname = decode_name(reader, buf)?;
-                let rname = decode_name(reader, buf)?;
+                let mname = decode_name(reader)?;
+                let rname = decode_name(reader)?;
                 let serial = reader.read_u32_be()?;
                 let refresh = reader.read_u32_be()?;
                 let retry = reader.read_u32_be()?;
@@ -135,12 +135,11 @@ impl ResourceRecord {
 
     fn decode_name_rdata(
         reader: &mut wire::Reader<'_>,
-        buf: &[u8],
         rdlength: usize,
     ) -> Result<DomainName, DnsError> {
         let start = reader.position();
 
-        let name = decode_name(reader, buf)?;
+        let name = decode_name(reader)?;
 
         let consumed = reader.position() - start;
         if consumed != rdlength {

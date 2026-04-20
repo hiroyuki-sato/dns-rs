@@ -8,9 +8,9 @@ use crate::wire;
 ///
 /// RFC 1035 name compression:
 /// https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.4
-pub fn decode_name(reader: &mut wire::Reader<'_>, buf: &[u8]) -> Result<String, DnsError> {
+pub fn decode_name(reader: &mut wire::Reader<'_>) -> Result<String, DnsError> {
     let mut visited_offsets = Vec::new();
-    decode_name_inner(reader, buf, &mut visited_offsets, 0)
+    decode_name_inner(reader, &mut visited_offsets, 0)
 }
 
 /// Internal DNS name decoder.
@@ -26,7 +26,6 @@ pub fn decode_name(reader: &mut wire::Reader<'_>, buf: &[u8]) -> Result<String, 
 /// `jump_count` limits how many pointers we follow.
 fn decode_name_inner(
     reader: &mut wire::Reader<'_>,
-    buf: &[u8],
     visited_offsets: &mut Vec<usize>,
     jump_count: usize,
 ) -> Result<String, DnsError> {
@@ -53,6 +52,8 @@ fn decode_name_inner(
             let b2 = reader.read_u8()?;
             let offset = ((((len & 0x3F) as u16) << 8) | b2 as u16) as usize;
 
+            let buf = reader.buf();
+
             // Pointer must refer to a valid position inside the message.
             if offset >= buf.len() {
                 return Err(DnsError::PointerOutOfBounds);
@@ -68,7 +69,7 @@ fn decode_name_inner(
             // Follow the pointer using a fresh reader rooted at the full buffer.
             let mut jump_reader = wire::Reader::new(&buf[offset..]);
 
-            let suffix = decode_name_inner(&mut jump_reader, buf, visited_offsets, jump_count + 1)?;
+            let suffix = decode_name_inner(&mut jump_reader, visited_offsets, jump_count + 1)?;
 
             labels.push(suffix);
 
@@ -137,7 +138,7 @@ mod test {
         let buf = qname_bytes("www.example.com");
         let mut reader = wire::Reader::new(&buf);
 
-        let name = decode_name(&mut reader, &buf).unwrap();
+        let name = decode_name(&mut reader).unwrap();
 
         assert_eq!(name, "www.example.com");
         assert_eq!(reader.position(), buf.len());
@@ -158,12 +159,12 @@ mod test {
         buf.push(0xC0);
         buf.push(example_offset as u8);
 
-        let mut reader = wire::Reader::new(&buf[compressed_start..]);
+        let mut reader = wire::Reader::at(&buf, compressed_start);
 
-        let name = decode_name(&mut reader, &buf).unwrap();
+        let name = decode_name(&mut reader).unwrap();
 
         assert_eq!(name, "www.example.com");
-        assert_eq!(reader.position(), 6);
+        assert_eq!(reader.position(), 19);
     }
 
     #[test]
@@ -171,7 +172,7 @@ mod test {
         let buf = vec![0xC0, 0xFF];
         let mut reader = wire::Reader::new(&buf);
 
-        let err = decode_name(&mut reader, &buf).unwrap_err();
+        let err = decode_name(&mut reader).unwrap_err();
 
         assert_eq!(err, DnsError::PointerOutOfBounds);
     }
@@ -181,7 +182,7 @@ mod test {
         let buf = vec![0xC0, 0x00];
         let mut reader = wire::Reader::new(&buf);
 
-        let err = decode_name(&mut reader, &buf).unwrap_err();
+        let err = decode_name(&mut reader).unwrap_err();
 
         assert_eq!(err, DnsError::CompressionLoop);
     }

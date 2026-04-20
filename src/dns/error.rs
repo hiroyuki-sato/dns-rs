@@ -101,7 +101,6 @@ mod tests {
 
     #[test]
     fn from_wire_error() {
-        // wire::Error の実定義に合わせてここは調整
         let wire_err = wire::Error::UnexpectedEof {
             position: 10,
             needed: 2,

@@ -41,36 +41,9 @@ pub struct Header {
     pub arcount: u16,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct DnsMessage {
-    pub header: Header,
-    pub questions: Vec<Question>,
-    pub answers: Vec<ResourceRecord>,
-    pub authorities: Vec<ResourceRecord>,
-    pub additionals: Vec<ResourceRecord>,
-}
-
-impl DnsMessage {
-    pub fn decode(buf: &[u8]) -> Result<Self, DnsError> {
-        let mut reader = wire::Reader::new(buf);
-
-        let header = Self::decode_header(&mut reader)?;
-        let questions = Self::decode_questions(&mut reader, buf, header.qdcount)?;
-        let answers = Self::decode_resource_records(&mut reader, buf, header.ancount)?;
-        let authorities = Self::decode_resource_records(&mut reader, buf, header.nscount)?;
-        let additionals = Self::decode_resource_records(&mut reader, buf, header.arcount)?;
-
-        Ok(Self {
-            header,
-            questions,
-            answers,
-            authorities,
-            additionals,
-        })
-    }
-
-    fn decode_header(reader: &mut wire::Reader<'_>) -> Result<Header, DnsError> {
-        let id = reader.read_u16_be()?;
+impl Header {
+    pub fn decode(reader: &mut wire::Reader) -> Result<Self, DnsError> {
+        let id: u16 = reader.read_u16_be()?;
         let flags = reader.read_u16_be()?;
 
         let qr = (flags & 0x8000) != 0;
@@ -104,6 +77,35 @@ impl DnsMessage {
         };
 
         Ok(header)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DnsMessage {
+    pub header: Header,
+    pub questions: Vec<Question>,
+    pub answers: Vec<ResourceRecord>,
+    pub authorities: Vec<ResourceRecord>,
+    pub additionals: Vec<ResourceRecord>,
+}
+
+impl DnsMessage {
+    pub fn decode(buf: &[u8]) -> Result<Self, DnsError> {
+        let mut reader = wire::Reader::new(buf);
+
+        let header = Header::decode(&mut reader)?;
+        let questions = Self::decode_questions(&mut reader, buf, header.qdcount)?;
+        let answers = Self::decode_resource_records(&mut reader, buf, header.ancount)?;
+        let authorities = Self::decode_resource_records(&mut reader, buf, header.nscount)?;
+        let additionals = Self::decode_resource_records(&mut reader, buf, header.arcount)?;
+
+        Ok(Self {
+            header,
+            questions,
+            answers,
+            authorities,
+            additionals,
+        })
     }
 
     fn decode_questions(
@@ -360,7 +362,7 @@ mod tests {
         push_u16_be(&mut buf, 4);
 
         let mut reader = wire::Reader::new(&buf);
-        let header = DnsMessage::decode_header(&mut reader).unwrap();
+        let header = Header::decode(&mut reader).unwrap();
 
         assert_eq!(
             header,

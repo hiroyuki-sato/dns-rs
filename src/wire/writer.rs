@@ -1,5 +1,3 @@
-use crate::wire::error::Error;
-
 pub struct Writer {
     buf: Vec<u8>,
 }

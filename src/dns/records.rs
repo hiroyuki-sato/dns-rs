@@ -1,41 +1,4 @@
-// https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
-
-// The header contains the following fields:
-//                                 1  1  1  1  1  1
-//   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |                      ID                       |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |                    QDCOUNT                    |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |                    ANCOUNT                    |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |                    NSCOUNT                    |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |                    ARCOUNT                    |
-// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-
 #[derive(Debug, PartialEq, Eq)]
-pub struct Header {
-    pub id: u16,
-    pub qr: bool,
-    pub opcode: u8,
-    pub aa: bool,
-    pub tc: bool,
-    pub rd: bool,
-    pub ra: bool,
-    pub z: u8,
-    pub rcode: u8,
-    pub qdcount: u16,
-    pub ancount: u16,
-    pub nscount: u16,
-    pub arcount: u16,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-
 pub struct Question {
     pub qname: DomainName,
     pub qtype: DnsType,

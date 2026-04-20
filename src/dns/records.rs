@@ -1,10 +1,3 @@
-#[derive(Debug, PartialEq, Eq)]
-pub struct Question {
-    pub qname: DomainName,
-    pub qtype: DnsType,
-    pub qclass: DnsClass,
-}
-
 pub type DomainName = String;
 pub type Text = Vec<Vec<u8>>;
 
@@ -77,15 +70,6 @@ impl From<DnsType> for u16 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResourceRecord {
-    pub name: DomainName,
-    pub rrtype: DnsType,
-    pub class: DnsClass,
-    pub ttl: u32,
-    pub rdata: RData,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DnsClass {
     Internet, // IN = 1
@@ -119,6 +103,9 @@ impl From<DnsClass> for u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::dns::question::Question;
+    use crate::dns::resource_record::ResourceRecord;
 
     #[test]
     fn dns_type_from_u16_known_values() {

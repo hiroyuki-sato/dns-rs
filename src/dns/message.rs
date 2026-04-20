@@ -1,6 +1,8 @@
 use crate::dns::error::DnsError;
 use crate::dns::name::decode_name;
-use crate::dns::records::{DnsClass, DnsType, DomainName, Question, RData, ResourceRecord, Text};
+use crate::dns::question::Question;
+use crate::dns::records::{DnsClass, DnsType, DomainName, RData, ResourceRecord, Text};
+
 use crate::wire;
 
 // https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
@@ -113,18 +115,8 @@ impl DnsMessage {
 
         // Read exactly qdcount question entries from the current reader position.
         for _ in 0..qdcount {
-            // QNAME is a DNS name in wire format.
-            let qname = decode_name(reader, buf)?;
-
-            // QTYPE and QCLASS are fixed-width fields after QNAME.
-            let qtype = DnsType::from(reader.read_u16_be()?);
-            let qclass = DnsClass::from(reader.read_u16_be()?);
-
-            questions.push(Question {
-                qname,
-                qtype,
-                qclass,
-            });
+            let question = Question::decode(reader, buf)?;
+            questions.push(question);
         }
 
         Ok(questions)

@@ -1,6 +1,60 @@
 use crate::dns::error::DnsError;
 use crate::wire;
 
+/// Encode a domain name into DNS wire format (uncompressed).
+///
+/// This function:
+/// - Removes a trailing dot (FQDN normalization)
+/// - Splits the name into labels by '.'
+/// - Encodes each label as: [length][bytes]
+/// - Appends a zero-length label (root terminator)
+///
+/// Example:
+/// "www.example.com" -> [3]www[7]example[3]com[0]
+///
+/// Notes:
+/// - This does NOT perform name compression (RFC 1035 section 4.1.4)
+/// - Each label must be <= 63 bytes
+/// - Total encoded name must be <= 255 bytes
+pub fn encode_name_uncompressed(name: &str) -> Result<Vec<u8>, DnsError> {
+    // Normalize: remove trailing dot (e.g. "example.com.")
+    let name = name.trim_end_matches('.');
+
+    let mut out = Vec::new();
+    let mut total_len = 0usize;
+
+    // Root (".") case → just write zero
+    if name.is_empty() {
+        out.push(0);
+        return Ok(out);
+    }
+
+    for label in name.split('.') {
+        let len = label.len();
+
+        // Each label must be <= 63 bytes
+        if len > 63 {
+            return Err(DnsError::LabelTooLong);
+        }
+
+        // Track total length (including label length byte)
+        total_len += 1 + len;
+
+        // Full name must be <= 255 bytes (including final zero)
+        if total_len + 1 > 255 {
+            return Err(DnsError::NameTooLong);
+        }
+
+        out.push(len as u8);
+        out.extend_from_slice(label.as_bytes());
+    }
+
+    // End of name
+    out.push(0);
+
+    Ok(out)
+}
+
 /// Decode a DNS name from the current reader position.
 ///
 /// This is a small public wrapper that initializes state used for
@@ -185,5 +239,69 @@ mod test {
         let err = decode_name(&mut reader).unwrap_err();
 
         assert_eq!(err, DnsError::CompressionLoop);
+    }
+
+    // ------------------------------------------------------------
+    // Name encoder tests
+    // ------------------------------------------------------------
+
+    #[test]
+    fn encode_name_uncompressed_basic() {
+        let encoded = encode_name_uncompressed("www.example.com").unwrap();
+
+        assert_eq!(
+            encoded,
+            vec![
+                3, b'w', b'w', b'w', 7, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 3, b'c', b'o',
+                b'm', 0
+            ]
+        );
+    }
+
+    #[test]
+    fn encode_name_uncompressed_trailing_dot() {
+        let encoded = encode_name_uncompressed("example.com.").unwrap();
+
+        assert_eq!(
+            encoded,
+            vec![
+                7, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 3, b'c', b'o', b'm', 0
+            ]
+        );
+    }
+
+    #[test]
+    fn encode_name_uncompressed_root() {
+        let encoded = encode_name_uncompressed(".").unwrap();
+        assert_eq!(encoded, vec![0]);
+    }
+
+    #[test]
+    fn encode_name_uncompressed_single_label() {
+        let encoded = encode_name_uncompressed("localhost").unwrap();
+
+        assert_eq!(
+            encoded,
+            vec![9, b'l', b'o', b'c', b'a', b'l', b'h', b'o', b's', b't', 0]
+        );
+    }
+
+    #[test]
+    fn encode_name_uncompressed_rejects_label_too_long() {
+        let long_label = "a".repeat(64);
+        let err = encode_name_uncompressed(&long_label).unwrap_err();
+
+        assert_eq!(err, DnsError::LabelTooLong);
+    }
+
+    #[test]
+    fn encode_name_uncompressed_rejects_name_too_long() {
+        // Construct a name slightly over 255 bytes
+        let label = "a".repeat(63);
+        let name = format!("{}.{}.{}.{}.{}", label, label, label, label, label);
+
+        let err = encode_name_uncompressed(&name).unwrap_err();
+
+        assert_eq!(err, DnsError::NameTooLong);
     }
 }

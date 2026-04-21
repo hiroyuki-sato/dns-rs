@@ -41,6 +41,9 @@ impl core::fmt::Display for DnsError {
     }
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for DnsError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

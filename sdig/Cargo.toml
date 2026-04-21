@@ -1,0 +1,9 @@
+[package]
+name = "sdig"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+dns-rs = { path = "..", features = ["std"] }
+clap = "4"

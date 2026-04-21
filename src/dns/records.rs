@@ -1,5 +1,5 @@
 use crate::dns::error::DnsError;
-use crate::dns::name::decode_name;
+use crate::dns::name::{decode_name, encode_name_uncompressed};
 use crate::wire;
 
 pub type DomainName = String;
@@ -178,6 +178,69 @@ impl RData {
 
         Ok(out)
     }
+
+    // --------------------------------------
+    // encode
+    // --------------------------------------
+    pub fn encode(&self, writer: &mut wire::Writer) -> Result<(), DnsError> {
+        match self {
+            RData::A(addr) => writer.write_array(addr),
+            RData::AAAA(addr) => writer.write_array(addr),
+            RData::CNAME(name) => {
+                let encoded = encode_name_uncompressed(name)?;
+                writer.write_slice(&encoded);
+            }
+            RData::NS(name) => {
+                let encoded = encode_name_uncompressed(name)?;
+                writer.write_slice(&encoded);
+            }
+            RData::PTR(name) => {
+                let encoded = encode_name_uncompressed(name)?;
+                writer.write_slice(&encoded);
+            }
+            RData::MX {
+                preference,
+                exchange,
+            } => {
+                writer.write_u16_be(*preference);
+                let encoded = encode_name_uncompressed(exchange)?;
+                writer.write_slice(&encoded);
+            }
+            RData::SOA {
+                mname,
+                rname,
+                serial,
+                refresh,
+                retry,
+                expire,
+                minimum,
+            } => {
+                let mname = encode_name_uncompressed(mname)?;
+                writer.write_slice(&mname);
+                let rname = encode_name_uncompressed(rname)?;
+                writer.write_slice(&rname);
+                writer.write_u32_be(*serial);
+                writer.write_u32_be(*refresh);
+                writer.write_u32_be(*retry);
+                writer.write_u32_be(*expire);
+                writer.write_u32_be(*minimum);
+            }
+            RData::TXT(texts) => {
+                for txt in texts {
+                    if txt.len() > 255 {
+                        return Err(DnsError::InvalidRdataLength {
+                            expected: 255,
+                            actual: txt.len(),
+                        });
+                    }
+                    writer.write_u8(txt.len() as u8);
+                    writer.write_slice(txt);
+                }
+            }
+            RData::Unknown(data) => writer.write_slice(data),
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -261,6 +324,10 @@ mod tests {
 
     use crate::dns::question::Question;
     use crate::dns::resource_record::ResourceRecord;
+
+    // ------------------------------------------------------------
+    // RData decoder tests
+    // ------------------------------------------------------------
 
     #[test]
     fn dns_type_from_u16_known_values() {
@@ -415,5 +482,226 @@ mod tests {
         let rdata = RData::Unknown(data.clone());
 
         assert_eq!(rdata, RData::Unknown(data));
+    }
+
+    // ------------------------------------------------------------
+    // encode test helpers
+    // ------------------------------------------------------------
+
+    fn qname_bytes(name: &str) -> Vec<u8> {
+        let mut out = Vec::new();
+
+        for label in name.split('.') {
+            out.push(label.len() as u8);
+            out.extend_from_slice(label.as_bytes());
+        }
+
+        out.push(0);
+        out
+    }
+
+    fn push_u16_be(buf: &mut Vec<u8>, value: u16) {
+        buf.extend_from_slice(&value.to_be_bytes());
+    }
+
+    fn push_u32_be(buf: &mut Vec<u8>, value: u32) {
+        buf.extend_from_slice(&value.to_be_bytes());
+    }
+
+    // ------------------------------------------------------------
+    // RData encoder tests
+    // ------------------------------------------------------------
+
+    #[test]
+    fn rdata_a_can_be_encoded() {
+        let rdata = RData::A([93, 184, 216, 34]);
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), vec![93, 184, 216, 34]);
+    }
+
+    #[test]
+    fn rdata_aaaa_can_be_encoded() {
+        let rdata = RData::AAAA([0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            vec![0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,]
+        );
+    }
+
+    #[test]
+    fn rdata_cname_can_be_encoded() {
+        let rdata = RData::CNAME("example.com".to_string());
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), qname_bytes("example.com"));
+    }
+
+    #[test]
+    fn rdata_ns_can_be_encoded() {
+        let rdata = RData::NS("ns1.example.com".to_string());
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), qname_bytes("ns1.example.com"));
+    }
+
+    #[test]
+    fn rdata_ptr_can_be_encoded() {
+        let rdata = RData::PTR("host.example.com".to_string());
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), qname_bytes("host.example.com"));
+    }
+
+    #[test]
+    fn rdata_mx_can_be_encoded() {
+        let rdata = RData::MX {
+            preference: 10,
+            exchange: "mail.example.com".to_string(),
+        };
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        let mut expected = Vec::new();
+        push_u16_be(&mut expected, 10);
+        expected.extend_from_slice(&qname_bytes("mail.example.com"));
+
+        assert_eq!(writer.into_inner(), expected);
+    }
+
+    #[test]
+    fn rdata_soa_can_be_encoded() {
+        let rdata = RData::SOA {
+            mname: "ns1.example.com".to_string(),
+            rname: "hostmaster.example.com".to_string(),
+            serial: 20240101,
+            refresh: 7200,
+            retry: 3600,
+            expire: 1209600,
+            minimum: 3600,
+        };
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&qname_bytes("ns1.example.com"));
+        expected.extend_from_slice(&qname_bytes("hostmaster.example.com"));
+        push_u32_be(&mut expected, 20240101);
+        push_u32_be(&mut expected, 7200);
+        push_u32_be(&mut expected, 3600);
+        push_u32_be(&mut expected, 1209600);
+        push_u32_be(&mut expected, 3600);
+
+        assert_eq!(writer.into_inner(), expected);
+    }
+
+    #[test]
+    fn rdata_txt_can_be_encoded() {
+        let rdata = RData::TXT(vec![b"hello".to_vec(), b"world".to_vec()]);
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            vec![
+                5, b'h', b'e', b'l', b'l', b'o', 5, b'w', b'o', b'r', b'l', b'd',
+            ]
+        );
+    }
+
+    #[test]
+    fn rdata_txt_empty_list_can_be_encoded() {
+        let rdata = RData::TXT(vec![]);
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn rdata_unknown_can_be_encoded() {
+        let rdata = RData::Unknown(vec![0xde, 0xad, 0xbe, 0xef]);
+        let mut writer = wire::Writer::new();
+
+        rdata.encode(&mut writer).unwrap();
+
+        assert_eq!(writer.into_inner(), vec![0xde, 0xad, 0xbe, 0xef]);
+    }
+
+    #[test]
+    fn rdata_txt_rejects_too_long_string_on_encode() {
+        let rdata = RData::TXT(vec![vec![b'a'; 256]]);
+        let mut writer = wire::Writer::new();
+
+        let err = rdata.encode(&mut writer).unwrap_err();
+
+        assert_eq!(
+            err,
+            DnsError::InvalidRdataLength {
+                expected: 255,
+                actual: 256,
+            }
+        );
+    }
+
+    #[test]
+    fn rdata_decode_a_roundtrip() {
+        let original = RData::A([93, 184, 216, 34]);
+
+        let mut writer = wire::Writer::new();
+        original.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        let mut reader = wire::Reader::new(&encoded);
+        let decoded = RData::decode(&mut reader, DnsType::A, encoded.len()).unwrap();
+
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn rdata_decode_mx_roundtrip() {
+        let original = RData::MX {
+            preference: 10,
+            exchange: "mail.example.com".to_string(),
+        };
+
+        let mut writer = wire::Writer::new();
+        original.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        let mut reader = wire::Reader::new(&encoded);
+        let decoded = RData::decode(&mut reader, DnsType::MX, encoded.len()).unwrap();
+
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn rdata_decode_txt_roundtrip() {
+        let original = RData::TXT(vec![b"hello".to_vec(), b"world".to_vec()]);
+
+        let mut writer = wire::Writer::new();
+        original.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        let mut reader = wire::Reader::new(&encoded);
+        let decoded = RData::decode(&mut reader, DnsType::TXT, encoded.len()).unwrap();
+
+        assert_eq!(decoded, original);
     }
 }

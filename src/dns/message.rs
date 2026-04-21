@@ -1,5 +1,6 @@
 use crate::dns::error::DnsError;
 use crate::dns::question::Question;
+use crate::dns::records::{DnsClass, DnsType};
 use crate::dns::resource_record::ResourceRecord;
 
 use crate::wire;
@@ -191,6 +192,44 @@ impl DnsMessage {
         }
 
         Ok(())
+    }
+
+    pub fn new_query(name: &str, qtype: DnsType, recursion: bool) -> Self {
+        DnsMessage {
+            header: Header {
+                id: Self::pseudo_id(),
+                qr: false,
+                opcode: 0,
+                aa: false,
+                tc: false,
+                rd: recursion,
+                ra: false,
+                z: 0,
+                rcode: 0,
+                qdcount: 1,
+                ancount: 0,
+                nscount: 0,
+                arcount: 0,
+            },
+
+            questions: vec![Question {
+                qname: name.to_string(),
+                qtype,
+                qclass: DnsClass::Internet,
+            }],
+
+            answers: vec![],
+            authorities: vec![],
+            additionals: vec![],
+        }
+    }
+
+    fn pseudo_id() -> u16 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
+        (now.subsec_nanos() & 0xffff) as u16
     }
 }
 

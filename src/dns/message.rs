@@ -23,7 +23,7 @@ use crate::wire;
 // |                    ARCOUNT                    |
 // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Header {
     pub id: u16,
     pub qr: bool,
@@ -76,6 +76,30 @@ impl Header {
         };
 
         Ok(header)
+    }
+
+    pub fn encode(&self, writer: &mut wire::Writer) -> Result<(), DnsError> {
+        writer.write_u16_be(self.id);
+
+        writer.write_u16_be(self.build_flags());
+
+        writer.write_u16_be(self.qdcount);
+        writer.write_u16_be(self.ancount);
+        writer.write_u16_be(self.nscount);
+        writer.write_u16_be(self.arcount);
+
+        Ok(())
+    }
+
+    fn build_flags(&self) -> u16 {
+        ((self.qr as u16) << 15)
+            | (((self.opcode as u16) & 0x0f) << 11)
+            | ((self.aa as u16) << 10)
+            | ((self.tc as u16) << 9)
+            | ((self.rd as u16) << 8)
+            | ((self.ra as u16) << 7)
+            | (((self.z as u16) & 0x07) << 4)
+            | ((self.rcode as u16) & 0x0f)
     }
 }
 
@@ -134,6 +158,39 @@ impl DnsMessage {
         }
 
         Ok(records)
+    }
+
+    pub fn encode(&self, writer: &mut wire::Writer) -> Result<(), DnsError> {
+        // Header counts must match actual sections
+        let mut header = self.header;
+        header.qdcount = self.questions.len() as u16;
+        header.ancount = self.answers.len() as u16;
+        header.nscount = self.authorities.len() as u16;
+        header.arcount = self.additionals.len() as u16;
+
+        header.encode(writer)?;
+
+        // Questions
+        for q in &self.questions {
+            q.encode(writer)?;
+        }
+
+        // Answers
+        for rr in &self.answers {
+            rr.encode(writer)?;
+        }
+
+        // Authorities
+        for rr in &self.authorities {
+            rr.encode(writer)?;
+        }
+
+        // Additionals
+        for rr in &self.additionals {
+            rr.encode(writer)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -324,7 +381,290 @@ mod tests {
     }
 
     // ============================================================
-    // End of decoder tests
-    // Encoding tests should be added below this line later.
+    // Encoder tests
+    // These tests cover only encoding-related behavior.
+    // ============================================================
+
+    // ------------------------------------------------------------
+    // Header encoder tests
+    // ------------------------------------------------------------
+
+    #[test]
+    fn encode_header_writes_all_fields() {
+        let header = Header {
+            id: 0x1234,
+            qr: true,
+            opcode: 0,
+            aa: true,
+            tc: false,
+            rd: true,
+            ra: true,
+            z: 0,
+            rcode: 3,
+            qdcount: 1,
+            ancount: 2,
+            nscount: 3,
+            arcount: 4,
+        };
+
+        let mut writer = wire::Writer::new();
+        header.encode(&mut writer).unwrap();
+
+        let mut expected = Vec::new();
+        push_u16_be(&mut expected, 0x1234);
+        push_u16_be(&mut expected, 0x8583);
+        push_u16_be(&mut expected, 1);
+        push_u16_be(&mut expected, 2);
+        push_u16_be(&mut expected, 3);
+        push_u16_be(&mut expected, 4);
+
+        assert_eq!(writer.into_inner(), expected);
+    }
+
+    #[test]
+    fn encode_header_writes_zero_flags() {
+        let header = Header {
+            id: 0xabcd,
+            qr: false,
+            opcode: 0,
+            aa: false,
+            tc: false,
+            rd: false,
+            ra: false,
+            z: 0,
+            rcode: 0,
+            qdcount: 0,
+            ancount: 0,
+            nscount: 0,
+            arcount: 0,
+        };
+
+        let mut writer = wire::Writer::new();
+        header.encode(&mut writer).unwrap();
+
+        let mut expected = Vec::new();
+        push_u16_be(&mut expected, 0xabcd);
+        push_u16_be(&mut expected, 0x0000);
+        push_u16_be(&mut expected, 0);
+        push_u16_be(&mut expected, 0);
+        push_u16_be(&mut expected, 0);
+        push_u16_be(&mut expected, 0);
+
+        assert_eq!(writer.into_inner(), expected);
+    }
+
+    // ------------------------------------------------------------
+    // Full message encoder tests
+    // ------------------------------------------------------------
+
+    #[test]
+    fn encode_message_with_one_question_and_one_answer() {
+        let msg = DnsMessage {
+            header: Header {
+                id: 0x1234,
+                qr: true,
+                opcode: 0,
+                aa: false,
+                tc: false,
+                rd: true,
+                ra: true,
+                z: 0,
+                rcode: 0,
+                qdcount: 1,
+                ancount: 1,
+                nscount: 0,
+                arcount: 0,
+            },
+            questions: vec![Question {
+                qname: "example.com".to_string(),
+                qtype: DnsType::A,
+                qclass: DnsClass::Internet,
+            }],
+            answers: vec![ResourceRecord {
+                name: "example.com".to_string(),
+                rrtype: DnsType::A,
+                class: DnsClass::Internet,
+                ttl: 300,
+                rdata: RData::A([93, 184, 216, 34]),
+            }],
+            authorities: vec![],
+            additionals: vec![],
+        };
+
+        let mut writer = wire::Writer::new();
+        msg.encode(&mut writer).unwrap();
+
+        let mut expected = Vec::new();
+
+        // Header
+        push_u16_be(&mut expected, 0x1234);
+        push_u16_be(&mut expected, 0x8180);
+        push_u16_be(&mut expected, 1);
+        push_u16_be(&mut expected, 1);
+        push_u16_be(&mut expected, 0);
+        push_u16_be(&mut expected, 0);
+
+        // Question
+        expected.extend_from_slice(&qname_bytes("example.com"));
+        push_u16_be(&mut expected, 1);
+        push_u16_be(&mut expected, 1);
+
+        // Answer
+        expected.extend_from_slice(&qname_bytes("example.com"));
+        push_u16_be(&mut expected, 1);
+        push_u16_be(&mut expected, 1);
+        push_u32_be(&mut expected, 300);
+        push_u16_be(&mut expected, 4);
+        expected.extend_from_slice(&[93, 184, 216, 34]);
+
+        assert_eq!(writer.into_inner(), expected);
+    }
+
+    #[test]
+    fn encode_message_overrides_header_counts_from_sections() {
+        let msg = DnsMessage {
+            header: Header {
+                id: 0x1234,
+                qr: false,
+                opcode: 0,
+                aa: false,
+                tc: false,
+                rd: true,
+                ra: false,
+                z: 0,
+                rcode: 0,
+                qdcount: 99,
+                ancount: 99,
+                nscount: 99,
+                arcount: 99,
+            },
+            questions: vec![Question {
+                qname: "example.com".to_string(),
+                qtype: DnsType::A,
+                qclass: DnsClass::Internet,
+            }],
+            answers: vec![],
+            authorities: vec![],
+            additionals: vec![],
+        };
+
+        let mut writer = wire::Writer::new();
+        msg.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        assert_eq!(u16::from_be_bytes([encoded[4], encoded[5]]), 1);
+        assert_eq!(u16::from_be_bytes([encoded[6], encoded[7]]), 0);
+        assert_eq!(u16::from_be_bytes([encoded[8], encoded[9]]), 0);
+        assert_eq!(u16::from_be_bytes([encoded[10], encoded[11]]), 0);
+    }
+
+    #[test]
+    fn encode_then_decode_message_roundtrip() {
+        let original = DnsMessage {
+            header: Header {
+                id: 0x1234,
+                qr: true,
+                opcode: 0,
+                aa: false,
+                tc: false,
+                rd: true,
+                ra: true,
+                z: 0,
+                rcode: 0,
+                qdcount: 1,
+                ancount: 1,
+                nscount: 0,
+                arcount: 0,
+            },
+            questions: vec![Question {
+                qname: "example.com".to_string(),
+                qtype: DnsType::A,
+                qclass: DnsClass::Internet,
+            }],
+            answers: vec![ResourceRecord {
+                name: "example.com".to_string(),
+                rrtype: DnsType::A,
+                class: DnsClass::Internet,
+                ttl: 300,
+                rdata: RData::A([93, 184, 216, 34]),
+            }],
+            authorities: vec![],
+            additionals: vec![],
+        };
+
+        let mut writer = wire::Writer::new();
+        original.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        let decoded = DnsMessage::decode(&encoded).unwrap();
+
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn encode_message_with_multiple_sections() {
+        let msg = DnsMessage {
+            header: Header {
+                id: 0x2222,
+                qr: true,
+                opcode: 0,
+                aa: true,
+                tc: false,
+                rd: true,
+                ra: true,
+                z: 0,
+                rcode: 0,
+                qdcount: 1,
+                ancount: 1,
+                nscount: 1,
+                arcount: 1,
+            },
+            questions: vec![Question {
+                qname: "example.com".to_string(),
+                qtype: DnsType::NS,
+                qclass: DnsClass::Internet,
+            }],
+            answers: vec![ResourceRecord {
+                name: "example.com".to_string(),
+                rrtype: DnsType::NS,
+                class: DnsClass::Internet,
+                ttl: 3600,
+                rdata: RData::NS("ns1.example.com".to_string()),
+            }],
+            authorities: vec![ResourceRecord {
+                name: "example.com".to_string(),
+                rrtype: DnsType::SOA,
+                class: DnsClass::Internet,
+                ttl: 3600,
+                rdata: RData::SOA {
+                    mname: "ns1.example.com".to_string(),
+                    rname: "hostmaster.example.com".to_string(),
+                    serial: 20240101,
+                    refresh: 7200,
+                    retry: 3600,
+                    expire: 1209600,
+                    minimum: 3600,
+                },
+            }],
+            additionals: vec![ResourceRecord {
+                name: "ns1.example.com".to_string(),
+                rrtype: DnsType::A,
+                class: DnsClass::Internet,
+                ttl: 300,
+                rdata: RData::A([192, 0, 2, 1]),
+            }],
+        };
+
+        let mut writer = wire::Writer::new();
+        msg.encode(&mut writer).unwrap();
+        let encoded = writer.into_inner();
+
+        let decoded = DnsMessage::decode(&encoded).unwrap();
+
+        assert_eq!(decoded, msg);
+    }
+
+    // ============================================================
+    // End of encoder tests
     // ============================================================
 }

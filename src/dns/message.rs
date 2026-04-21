@@ -2,7 +2,6 @@ use crate::dns::error::DnsError;
 use crate::dns::question::Question;
 use crate::dns::records::{DnsClass, DnsType};
 use crate::dns::resource_record::ResourceRecord;
-
 use crate::wire;
 
 // https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
@@ -237,7 +236,7 @@ impl DnsMessage {
 mod tests {
     use super::*;
 
-    use crate::dns::records::RData;
+    use crate::dns::rdata::RData;
     use crate::dns::records::{DnsClass, DnsType};
 
     // ============================================================

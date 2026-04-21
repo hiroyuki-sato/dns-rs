@@ -1,6 +1,7 @@
 use crate::dns::error::DnsError;
 use crate::dns::name::{decode_name, encode_name_uncompressed};
-use crate::dns::records::{DnsClass, DnsType, DomainName, RData};
+use crate::dns::rdata::RData;
+use crate::dns::records::{DnsClass, DnsType, DomainName};
 use crate::wire;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

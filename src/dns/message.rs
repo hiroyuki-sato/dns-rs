@@ -24,6 +24,45 @@ use crate::wire;
 // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RCode {
+    NoError,
+    FormatError,
+    ServerFailure,
+    NxDomain,
+    NotImplemented,
+    Refused,
+    Unknown(u8),
+}
+
+impl From<u8> for RCode {
+    fn from(n: u8) -> Self {
+        match n & 0x0f {
+            0 => RCode::NoError,
+            1 => RCode::FormatError,
+            2 => RCode::ServerFailure,
+            3 => RCode::NxDomain,
+            4 => RCode::NotImplemented,
+            5 => RCode::Refused,
+            _ => RCode::Unknown(n),
+        }
+    }
+}
+
+impl From<RCode> for u8 {
+    fn from(t: RCode) -> u8 {
+        match t {
+            RCode::NoError => 0,
+            RCode::FormatError => 1,
+            RCode::ServerFailure => 2,
+            RCode::NxDomain => 3,
+            RCode::NotImplemented => 4,
+            RCode::Refused => 5,
+            RCode::Unknown(n) => n,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Header {
     pub id: u16,
     pub qr: bool,
@@ -33,7 +72,7 @@ pub struct Header {
     pub rd: bool,
     pub ra: bool,
     pub z: u8,
-    pub rcode: u8,
+    pub rcode: RCode,
     pub qdcount: u16,
     pub ancount: u16,
     pub nscount: u16,
@@ -52,7 +91,7 @@ impl Header {
         let rd = (flags & 0x0100) != 0;
         let ra = (flags & 0x0080) != 0;
         let z = ((flags >> 4) & 0x07) as u8;
-        let rcode = (flags & 0x000F) as u8;
+        let rcode = RCode::from((flags & 0x000F) as u8);
 
         let qdcount = reader.read_u16_be()?;
         let ancount = reader.read_u16_be()?;
@@ -99,7 +138,7 @@ impl Header {
             | ((self.rd as u16) << 8)
             | ((self.ra as u16) << 7)
             | (((self.z as u16) & 0x07) << 4)
-            | ((self.rcode as u16) & 0x0f)
+            | ((u8::from(self.rcode) as u16) & 0x0f)
     }
 }
 
@@ -204,7 +243,7 @@ impl DnsMessage {
                 rd: recursion,
                 ra: false,
                 z: 0,
-                rcode: 0,
+                rcode: RCode::NoError,
                 qdcount: 1,
                 ancount: 0,
                 nscount: 0,
@@ -305,7 +344,7 @@ mod tests {
                 rd: true,
                 ra: true,
                 z: 0,
-                rcode: 3,
+                rcode: RCode::NxDomain,
                 qdcount: 1,
                 ancount: 2,
                 nscount: 3,
@@ -394,7 +433,7 @@ mod tests {
                     rd: true,
                     ra: true,
                     z: 0,
-                    rcode: 0,
+                    rcode: RCode::NoError,
                     qdcount: 1,
                     ancount: 1,
                     nscount: 0,
@@ -438,7 +477,7 @@ mod tests {
             rd: true,
             ra: true,
             z: 0,
-            rcode: 3,
+            rcode: RCode::NxDomain,
             qdcount: 1,
             ancount: 2,
             nscount: 3,
@@ -470,7 +509,7 @@ mod tests {
             rd: false,
             ra: false,
             z: 0,
-            rcode: 0,
+            rcode: RCode::NoError,
             qdcount: 0,
             ancount: 0,
             nscount: 0,
@@ -507,7 +546,7 @@ mod tests {
                 rd: true,
                 ra: true,
                 z: 0,
-                rcode: 0,
+                rcode: RCode::NoError,
                 qdcount: 1,
                 ancount: 1,
                 nscount: 0,
@@ -570,7 +609,7 @@ mod tests {
                 rd: true,
                 ra: false,
                 z: 0,
-                rcode: 0,
+                rcode: RCode::NoError,
                 qdcount: 99,
                 ancount: 99,
                 nscount: 99,
@@ -608,7 +647,7 @@ mod tests {
                 rd: true,
                 ra: true,
                 z: 0,
-                rcode: 0,
+                rcode: RCode::NoError,
                 qdcount: 1,
                 ancount: 1,
                 nscount: 0,
@@ -651,7 +690,7 @@ mod tests {
                 rd: true,
                 ra: true,
                 z: 0,
-                rcode: 0,
+                rcode: RCode::NoError,
                 qdcount: 1,
                 ancount: 1,
                 nscount: 1,

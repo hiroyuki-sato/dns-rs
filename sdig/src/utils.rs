@@ -55,15 +55,14 @@ fn format_rdata(rdata: &RData) -> String {
 }
 
 pub fn format_resource_record(rr: &ResourceRecord) -> String {
-    let mut out = String::new();
-
-    out.push_str(&format!("name: {}\n", rr.name));
-    out.push_str(&format!("type: {:?}\n", rr.rrtype));
-    out.push_str(&format!("class: {:?}\n", rr.class));
-    out.push_str(&format!("ttl: {}\n", rr.ttl));
-    out.push_str(&format!("{}\n", format_rdata(&rr.rdata)));
-
-    out
+    format!(
+        "{}\t{}\t{:?}\t{:?}\t{}\n",
+        rr.name,
+        rr.ttl,
+        rr.class,
+        rr.rrtype,
+        format_rdata(&rr.rdata),
+    )
 }
 
 pub fn format_request(msg: &DnsMessage) -> String {
@@ -75,12 +74,14 @@ pub fn format_request(msg: &DnsMessage) -> String {
     out.push_str(&";".repeat(60));
     out.push('\n');
 
-    out.push_str(&format!(";; id: {}\n", msg.header.id));
-    out.push_str(&format!(";; opcode: {}\n", msg.header.opcode));
-    out.push_str(&format!(";; recursive: {}\n", msg.header.rd));
+    out.push_str(&format!(";; {:<15}: {}\n", "id", msg.header.id));
+    out.push_str(&format!(";; {:<15}: {}\n", "recursive req", msg.header.rd));
 
     if let Some(q) = msg.questions.first() {
-        out.push_str(&format!(";; query: {} ({:?})\n", q.qname, q.qtype));
+        out.push_str(&format!(
+            ";; {:<15}: {} ({:?})\n",
+            "query", q.qname, q.qtype
+        ));
     }
 
     out
@@ -95,12 +96,16 @@ pub fn format_response(msg: &DnsMessage) -> String {
     out.push_str(&";".repeat(60));
     out.push('\n');
 
-    out.push_str(&format!(";; id: {}\n", msg.header.id));
-    out.push_str(&format!(";; opcode: {}\n", msg.header.opcode));
-    out.push_str(&format!(";; authoritative: {}\n", msg.header.aa));
-    out.push_str(&format!(";; truncated: {}\n", msg.header.tc));
-    out.push_str(&format!(";; recursive desired: {}\n", msg.header.rd));
-    out.push_str(&format!(";; recursive available: {}\n", msg.header.ra));
+    out.push_str(&format!(";; {:<15}: {}\n", "id", msg.header.id));
+    out.push_str(&format!(";; {:<15}: {}\n", "opcode", msg.header.opcode));
+    out.push_str(&format!(";; {:<15}: {}\n", "authoritative", msg.header.aa));
+    out.push_str(&format!(";; {:<15}: {}\n", "truncated", msg.header.tc));
+    out.push_str(&format!(";; {:<15}: {}\n", "recursive req", msg.header.rd));
+    out.push_str(&format!(
+        ";; {:<15}: {}\n",
+        "recursive avail", msg.header.ra
+    ));
+    out.push_str(&format!(";; {:<15}: {:?}\n", "status", msg.header.rcode));
     out.push('\n');
 
     out.push_str(";; ANSWERS\n");

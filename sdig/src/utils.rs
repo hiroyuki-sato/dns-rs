@@ -56,7 +56,7 @@ fn format_rdata(rdata: &RData) -> String {
 
 pub fn format_resource_record(rr: &ResourceRecord) -> String {
     format!(
-        "{}\t{}\t{:?}\t{:?}\t{}\n",
+        "{}\t{}\t{}\t{:?}\t{}\n",
         rr.name,
         rr.ttl,
         rr.class,

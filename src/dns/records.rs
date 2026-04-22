@@ -75,3 +75,14 @@ impl From<DnsClass> for u16 {
         }
     }
 }
+
+impl core::fmt::Display for DnsClass {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            DnsClass::Internet => write!(f, "IN"),
+            DnsClass::Chaos => write!(f, "CH"),
+            DnsClass::Hesiod => write!(f, "HS"),
+            DnsClass::Unknown(n) => write!(f, "Unknown({})", n),
+        }
+    }
+}

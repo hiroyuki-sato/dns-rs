@@ -1,6 +1,8 @@
+use std::net::{Ipv4Addr, Ipv6Addr};
+
 use dns_rs::dns::message::DnsMessage;
 use dns_rs::dns::rdata::RData;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use dns_rs::dns::resource_record::ResourceRecord;
 
 // --------------------------------------
 // conversion methods
@@ -52,8 +54,26 @@ fn format_rdata(rdata: &RData) -> String {
     }
 }
 
+pub fn format_resource_record(rr: &ResourceRecord) -> String {
+    let mut out = String::new();
+
+    out.push_str(&format!("name: {}\n", rr.name));
+    out.push_str(&format!("type: {:?}\n", rr.rrtype));
+    out.push_str(&format!("class: {:?}\n", rr.class));
+    out.push_str(&format!("ttl: {}\n", rr.ttl));
+    out.push_str(&format!("{}\n", format_rdata(&rr.rdata)));
+
+    out
+}
+
 pub fn format_request(msg: &DnsMessage) -> String {
     let mut out = String::new();
+
+    out.push_str(&";".repeat(60));
+    out.push('\n');
+    out.push_str(";; REQUEST\n");
+    out.push_str(&";".repeat(60));
+    out.push('\n');
 
     out.push_str(&format!(";; id: {}\n", msg.header.id));
     out.push_str(&format!(";; opcode: {}\n", msg.header.opcode));
@@ -61,6 +81,41 @@ pub fn format_request(msg: &DnsMessage) -> String {
 
     if let Some(q) = msg.questions.first() {
         out.push_str(&format!(";; query: {} ({:?})\n", q.qname, q.qtype));
+    }
+
+    out
+}
+
+pub fn format_response(msg: &DnsMessage) -> String {
+    let mut out = String::new();
+
+    out.push_str(&";".repeat(60));
+    out.push('\n');
+    out.push_str(";; ANSWER\n");
+    out.push_str(&";".repeat(60));
+    out.push('\n');
+
+    out.push_str(&format!(";; id: {}\n", msg.header.id));
+    out.push_str(&format!(";; opcode: {}\n", msg.header.opcode));
+    out.push_str(&format!(";; authoritative: {}\n", msg.header.aa));
+    out.push_str(&format!(";; truncated: {}\n", msg.header.tc));
+    out.push_str(&format!(";; recursive desired: {}\n", msg.header.rd));
+    out.push_str(&format!(";; recursive available: {}\n", msg.header.ra));
+    out.push('\n');
+
+    out.push_str(";; ANSWERS\n");
+    for rr in &msg.answers {
+        out.push_str(&format_resource_record(rr));
+    }
+
+    out.push_str(";; AUTHORITIES\n");
+    for rr in &msg.authorities {
+        out.push_str(&format_resource_record(rr));
+    }
+
+    out.push_str(";; ADDITIONALS\n");
+    for rr in &msg.additionals {
+        out.push_str(&format_resource_record(rr));
     }
 
     out

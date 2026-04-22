@@ -7,7 +7,7 @@ use dns_rs::dns::message::DnsMessage;
 use dns_rs::dns::records::DnsType;
 use dns_rs::wire;
 
-use crate::utils::format_request;
+use crate::utils::{format_request, format_response};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dns_type = DnsType::A;
@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = [0u8; 512];
     let (size, from) = socket.recv_from(&mut buf)?;
 
-    println!("{}", format_request(&query));
-    println!("received {} bytes from {}", size, from);
+    print!("{}", format_request(&query));
     let response = DnsMessage::decode(&buf[..size])?;
-    println!("{:#?}", response);
+    println!("{}", format_response(&response));
+    println!("received {} bytes from {}", size, from);
 
     Ok(())
 }

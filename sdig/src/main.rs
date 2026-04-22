@@ -1,9 +1,13 @@
+mod utils;
+
 use std::net::UdpSocket;
 use std::time::Duration;
 
 use dns_rs::dns::message::DnsMessage;
 use dns_rs::dns::records::DnsType;
 use dns_rs::wire;
+
+use crate::utils::format_request;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dns_type = DnsType::A;
@@ -22,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = [0u8; 512];
     let (size, from) = socket.recv_from(&mut buf)?;
 
+    println!("{}", format_request(&query));
     println!("received {} bytes from {}", size, from);
     let response = DnsMessage::decode(&buf[..size])?;
     println!("{:#?}", response);

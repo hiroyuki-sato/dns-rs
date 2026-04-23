@@ -2,6 +2,7 @@ mod utils;
 
 use std::net::UdpSocket;
 use std::time::Duration;
+use std::time::Instant;
 
 use dns_rs::dns::message::DnsMessage;
 use dns_rs::dns::records::{DnsClass, DnsType};
@@ -62,17 +63,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_read_timeout(Some(Duration::from_secs(3)))?;
 
-    // Google Public DNS
+    let start = Instant::now();
     socket.send_to(&packet, parsed.server.unwrap())?;
 
     let mut buf = [0u8; 512];
     let (size, from) = socket.recv_from(&mut buf)?;
+    let elapsed = start.elapsed();
 
     print!("{}", format_request(&query));
     let response = DnsMessage::decode(&buf[..size])?;
     println!("{}", format_response(&response));
-    println!("received {} bytes from {}", size, from);
-
+    println!(
+        "received {} bytes from {} in {} ms",
+        size,
+        from,
+        elapsed.as_millis()
+    );
     Ok(())
 }
 

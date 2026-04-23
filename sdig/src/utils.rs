@@ -67,7 +67,7 @@ pub fn format_resource_record(rr: &ResourceRecord) -> String {
     )
 }
 
-pub fn format_request(msg: &DnsMessage, color: bool) -> String {
+pub fn format_request(msg: &DnsMessage, _color: bool) -> String {
     let mut out = String::new();
 
     out.push_str(&colorize(&";".repeat(60), Color::Blue));

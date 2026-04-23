@@ -23,7 +23,7 @@ pub fn encode_name_uncompressed(name: &str) -> Result<Vec<u8>, DnsError> {
     let mut out = Vec::new();
     let mut total_len = 0usize;
 
-    // Root (".") case → just write zero
+    // Root (".") case -> just write zero
     if name.is_empty() {
         out.push(0);
         return Ok(out);
@@ -78,6 +78,12 @@ pub fn decode_name(reader: &mut wire::Reader<'_>) -> Result<String, DnsError> {
 ///
 /// `visited_offsets` tracks pointer targets already followed.
 /// `jump_count` limits how many pointers we follow.
+///
+/// Important:
+/// DNS compression pointer offsets are relative to the beginning of the
+/// DNS message buffer, not relative to the current reader position.
+/// Therefore, when following a pointer we must create a new reader whose
+/// position is set to the absolute offset within the original DNS buffer.
 fn decode_name_inner(
     reader: &mut wire::Reader<'_>,
     visited_offsets: &mut Vec<usize>,
@@ -108,7 +114,7 @@ fn decode_name_inner(
 
             let buf = reader.buf();
 
-            // Pointer must refer to a valid position inside the message.
+            // Pointer must refer to a valid position inside the DNS message.
             if offset >= buf.len() {
                 return Err(DnsError::PointerOutOfBounds);
             }
@@ -120,11 +126,11 @@ fn decode_name_inner(
 
             visited_offsets.push(offset);
 
-            // Follow the pointer using a fresh reader rooted at the full buffer.
-            let mut jump_reader = wire::Reader::new(&buf[offset..]);
+            // Follow the pointer using a reader positioned at the absolute
+            // offset in the original DNS message buffer.
+            let mut jump_reader = wire::Reader::at(buf, offset);
 
             let suffix = decode_name_inner(&mut jump_reader, visited_offsets, jump_count + 1)?;
-
             labels.push(suffix);
 
             // A compression pointer terminates the current name.
@@ -218,7 +224,37 @@ mod test {
         let name = decode_name(&mut reader).unwrap();
 
         assert_eq!(name, "www.example.com");
-        assert_eq!(reader.position(), 19);
+        assert_eq!(reader.position(), compressed_start + 6);
+    }
+
+    #[test]
+    fn decode_name_reads_nested_compressed_name() {
+        let mut buf = Vec::new();
+
+        // 0x00: example.com
+        let example_offset = buf.len();
+        buf.extend_from_slice(&qname_bytes("example.com"));
+
+        // next: condor + pointer to example.com
+        let condor_offset = buf.len();
+        buf.push(6);
+        buf.extend_from_slice(b"condor");
+        buf.push(0xC0);
+        buf.push(example_offset as u8);
+
+        // next: mail + pointer to condor.example.com
+        let mail_offset = buf.len();
+        buf.push(4);
+        buf.extend_from_slice(b"mail");
+        buf.push(0xC0);
+        buf.push(condor_offset as u8);
+
+        let mut reader = wire::Reader::at(&buf, mail_offset);
+
+        let name = decode_name(&mut reader).unwrap();
+
+        assert_eq!(name, "mail.condor.example.com");
+        assert_eq!(reader.position(), mail_offset + 7);
     }
 
     #[test]
@@ -296,7 +332,6 @@ mod test {
 
     #[test]
     fn encode_name_uncompressed_rejects_name_too_long() {
-        // Construct a name slightly over 255 bytes
         let label = "a".repeat(63);
         let name = format!("{}.{}.{}.{}.{}", label, label, label, label, label);
 

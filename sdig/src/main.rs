@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = [0u8; 512];
     let (size, from) = socket.recv_from(&mut buf)?;
 
-    print!("{}", format_request(&query));
+    print!("{}", format_request(&query, true));
     let response = DnsMessage::decode(&buf[..size])?;
     println!("{}", format_response(&response));
     println!("received {} bytes from {}", size, from);

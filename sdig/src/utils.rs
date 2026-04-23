@@ -1,5 +1,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use owo_colors::OwoColorize;
+
 use dns_rs::dns::message::DnsMessage;
 use dns_rs::dns::rdata::RData;
 use dns_rs::dns::resource_record::ResourceRecord;
@@ -65,10 +67,10 @@ pub fn format_resource_record(rr: &ResourceRecord) -> String {
     )
 }
 
-pub fn format_request(msg: &DnsMessage) -> String {
+pub fn format_request(msg: &DnsMessage, color: bool) -> String {
     let mut out = String::new();
 
-    out.push_str(&";".repeat(60));
+    out.push_str(&colorize(&";".repeat(60), Color::Blue));
     out.push('\n');
     out.push_str(";; REQUEST\n");
     out.push_str(&";".repeat(60));
@@ -86,7 +88,6 @@ pub fn format_request(msg: &DnsMessage) -> String {
 
     out
 }
-
 pub fn format_response(msg: &DnsMessage) -> String {
     let mut out = String::new();
 
@@ -108,7 +109,7 @@ pub fn format_response(msg: &DnsMessage) -> String {
     out.push_str(&format!(";; {:<15}: {:?}\n", "status", msg.header.rcode));
     out.push('\n');
 
-    out.push_str(";; ANSWERS\n");
+    out.push_str(&colorize(";; ANSWERS\n", Color::Magenta));
     for rr in &msg.answers {
         out.push_str(&format_resource_record(rr));
     }
@@ -124,4 +125,31 @@ pub fn format_response(msg: &DnsMessage) -> String {
     }
 
     out
+}
+
+#[allow(dead_code)] // reserved for future color usage
+enum Color {
+    Black,
+    Blue,
+    Cyan,
+    Green,
+    Magenta,
+    Red,
+    Yellow,
+    White,
+    None,
+}
+
+fn colorize(s: &str, c: Color) -> String {
+    match c {
+        Color::Black => format!("{}", s.black()),
+        Color::Blue => format!("{}", s.blue()),
+        Color::Cyan => format!("{}", s.cyan()),
+        Color::Green => format!("{}", s.green()),
+        Color::Magenta => format!("{}", s.magenta()),
+        Color::Red => format!("{}", s.red()),
+        Color::Yellow => format!("{}", s.yellow()),
+        Color::White => format!("{}", s.white()),
+        Color::None => s.to_string(),
+    }
 }

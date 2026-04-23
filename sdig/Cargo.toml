@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 dns-rs = { path = "..", features = ["std"] }
+owo-colors = "4"
+is-terminal = "0.4"

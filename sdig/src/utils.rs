@@ -1,5 +1,6 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use is_terminal::IsTerminal;
 use owo_colors::OwoColorize;
 
 use dns_rs::dns::message::DnsMessage;
@@ -67,59 +68,109 @@ pub fn format_resource_record(rr: &ResourceRecord) -> String {
     )
 }
 
-pub fn format_request(msg: &DnsMessage, _color: bool) -> String {
+pub fn format_request(msg: &DnsMessage) -> String {
     let mut out = String::new();
 
-    out.push_str(&colorize(&";".repeat(60), Color::Blue));
+    let text_color: Color = if std::io::stdout().is_terminal() {
+        Color::Blue
+    } else {
+        Color::None
+    };
+
+    out.push_str(&colorize(&";".repeat(60), &text_color));
     out.push('\n');
-    out.push_str(";; REQUEST\n");
-    out.push_str(&";".repeat(60));
+    out.push_str(&colorize(";; REQUEST\n", &text_color));
+    out.push_str(&colorize(&";".repeat(60), &text_color));
     out.push('\n');
 
-    out.push_str(&format!(";; {:<15}: {}\n", "id", msg.header.id));
-    out.push_str(&format!(";; {:<15}: {}\n", "recursive req", msg.header.rd));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; id             ", &text_color),
+        msg.header.id
+    ));
+
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; recursive req  ", &text_color),
+        msg.header.rd
+    ));
 
     if let Some(q) = msg.questions.first() {
         out.push_str(&format!(
-            ";; {:<15}: {} ({:?})\n",
-            "query", q.qname, q.qtype
+            "{}: {} ({:?})\n",
+            colorize(";; query          ", &text_color),
+            q.qname,
+            q.qtype
         ));
     }
+    out.push('\n');
 
     out
 }
 pub fn format_response(msg: &DnsMessage) -> String {
     let mut out = String::new();
 
-    out.push_str(&";".repeat(60));
+    let text_color: Color = if std::io::stdout().is_terminal() {
+        Color::Magenta
+    } else {
+        Color::None
+    };
+
+    out.push_str(&colorize(&";".repeat(60), &text_color));
     out.push('\n');
-    out.push_str(";; ANSWER\n");
-    out.push_str(&";".repeat(60));
+    out.push_str(&colorize(";; ANSWER\n", &text_color));
+    out.push_str(&colorize(&";".repeat(60), &text_color));
     out.push('\n');
 
-    out.push_str(&format!(";; {:<15}: {}\n", "id", msg.header.id));
-    out.push_str(&format!(";; {:<15}: {}\n", "opcode", msg.header.opcode));
-    out.push_str(&format!(";; {:<15}: {}\n", "authoritative", msg.header.aa));
-    out.push_str(&format!(";; {:<15}: {}\n", "truncated", msg.header.tc));
-    out.push_str(&format!(";; {:<15}: {}\n", "recursive req", msg.header.rd));
     out.push_str(&format!(
-        ";; {:<15}: {}\n",
-        "recursive avail", msg.header.ra
+        "{}: {}\n",
+        colorize(";; id             ", &text_color),
+        msg.header.id
     ));
-    out.push_str(&format!(";; {:<15}: {:?}\n", "status", msg.header.rcode));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; opcode         ", &text_color),
+        msg.header.opcode
+    ));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; authoritative  ", &text_color),
+        msg.header.aa
+    ));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; truncated      ", &text_color),
+        msg.header.tc
+    ));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; recursive req  ", &text_color),
+        msg.header.rd
+    ));
+    out.push_str(&format!(
+        "{}: {}\n",
+        colorize(";; recursive avail", &text_color),
+        msg.header.ra
+    ));
+    out.push_str(&format!(
+        "{}: {:?}\n",
+        colorize(";; status         ", &text_color),
+        msg.header.rcode
+    ));
+
     out.push('\n');
 
-    out.push_str(&colorize(";; ANSWERS\n", Color::Magenta));
+    out.push_str(&colorize(";; ANSWERS\n", &text_color));
     for rr in &msg.answers {
         out.push_str(&format_resource_record(rr));
     }
 
-    out.push_str(";; AUTHORITIES\n");
+    out.push_str(&colorize(";; AUTHORITIES\n", &text_color));
     for rr in &msg.authorities {
         out.push_str(&format_resource_record(rr));
     }
 
-    out.push_str(";; ADDITIONALS\n");
+    out.push_str(&colorize(";; ADDITIONALS\n", &text_color));
     for rr in &msg.additionals {
         out.push_str(&format_resource_record(rr));
     }
@@ -140,7 +191,7 @@ enum Color {
     None,
 }
 
-fn colorize(s: &str, c: Color) -> String {
+fn colorize(s: &str, c: &Color) -> String {
     match c {
         Color::Black => format!("{}", s.black()),
         Color::Blue => format!("{}", s.blue()),

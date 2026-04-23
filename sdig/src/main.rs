@@ -53,7 +53,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    println!("{}", parsed.server.clone().unwrap());
     let query = DnsMessage::new_query(&parsed.name.unwrap(), parsed.qtype, parsed.recursion);
 
     let mut writer = wire::Writer::new();
@@ -69,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = [0u8; 512];
     let (size, from) = socket.recv_from(&mut buf)?;
 
-    print!("{}", format_request(&query, true));
+    print!("{}", format_request(&query));
     let response = DnsMessage::decode(&buf[..size])?;
     println!("{}", format_response(&response));
     println!("received {} bytes from {}", size, from);

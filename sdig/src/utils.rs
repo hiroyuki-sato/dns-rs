@@ -84,21 +84,21 @@ pub fn format_request(msg: &DnsMessage) -> String {
     out.push('\n');
 
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; id             ", &text_color),
+        "{} {}\n",
+        colorize(";; id             :", &text_color),
         msg.header.id
     ));
 
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; recursive req  ", &text_color),
+        "{} {}\n",
+        colorize(";; recursive req  :", &text_color),
         msg.header.rd
     ));
 
     if let Some(q) = msg.questions.first() {
         out.push_str(&format!(
-            "{}: {} ({:?})\n",
-            colorize(";; query          ", &text_color),
+            "{} {} ({:?})\n",
+            colorize(";; query          :", &text_color),
             q.qname,
             q.qtype
         ));
@@ -123,38 +123,38 @@ pub fn format_response(msg: &DnsMessage) -> String {
     out.push('\n');
 
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; id             ", &text_color),
+        "{} {}\n",
+        colorize(";; id             :", &text_color),
         msg.header.id
     ));
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; opcode         ", &text_color),
+        "{} {}\n",
+        colorize(";; opcode         :", &text_color),
         msg.header.opcode
     ));
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; authoritative  ", &text_color),
+        "{} {}\n",
+        colorize(";; authoritative  :", &text_color),
         msg.header.aa
     ));
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; truncated      ", &text_color),
+        "{} {}\n",
+        colorize(";; truncated      :", &text_color),
         msg.header.tc
     ));
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; recursive req  ", &text_color),
+        "{} {}\n",
+        colorize(";; recursive req  :", &text_color),
         msg.header.rd
     ));
     out.push_str(&format!(
-        "{}: {}\n",
-        colorize(";; recursive avail", &text_color),
+        "{} {}\n",
+        colorize(";; recursive avail:", &text_color),
         msg.header.ra
     ));
     out.push_str(&format!(
-        "{}: {:?}\n",
-        colorize(";; status         ", &text_color),
+        "{} {:?}\n",
+        colorize(";; status         :", &text_color),
         msg.header.rcode
     ));
 

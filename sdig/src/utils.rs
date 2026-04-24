@@ -77,28 +77,28 @@ pub fn format_request(msg: &DnsMessage) -> String {
         Color::None
     };
 
-    out.push_str(&colorize(&";".repeat(60), &text_color));
+    out.push_str(&colorize(&";".repeat(60), text_color));
     out.push('\n');
-    out.push_str(&colorize(";; REQUEST\n", &text_color));
-    out.push_str(&colorize(&";".repeat(60), &text_color));
+    out.push_str(&colorize(";; REQUEST\n", text_color));
+    out.push_str(&colorize(&";".repeat(60), text_color));
     out.push('\n');
 
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; id             :", &text_color),
+        colorize(";; id             :", text_color),
         msg.header.id
     ));
 
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; recursive req  :", &text_color),
+        colorize(";; recursive req  :", text_color),
         msg.header.rd
     ));
 
     if let Some(q) = msg.questions.first() {
         out.push_str(&format!(
             "{} {} ({:?})\n",
-            colorize(";; query          :", &text_color),
+            colorize(";; query          :", text_color),
             q.qname,
             q.qtype
         ));
@@ -116,61 +116,61 @@ pub fn format_response(msg: &DnsMessage) -> String {
         Color::None
     };
 
-    out.push_str(&colorize(&";".repeat(60), &text_color));
+    out.push_str(&colorize(&";".repeat(60), text_color));
     out.push('\n');
-    out.push_str(&colorize(";; ANSWER\n", &text_color));
-    out.push_str(&colorize(&";".repeat(60), &text_color));
+    out.push_str(&colorize(";; ANSWER\n", text_color));
+    out.push_str(&colorize(&";".repeat(60), text_color));
     out.push('\n');
 
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; id             :", &text_color),
+        colorize(";; id             :", text_color),
         msg.header.id
     ));
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; opcode         :", &text_color),
+        colorize(";; opcode         :", text_color),
         msg.header.opcode
     ));
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; authoritative  :", &text_color),
+        colorize(";; authoritative  :", text_color),
         msg.header.aa
     ));
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; truncated      :", &text_color),
+        colorize(";; truncated      :", text_color),
         msg.header.tc
     ));
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; recursive req  :", &text_color),
+        colorize(";; recursive req  :", text_color),
         msg.header.rd
     ));
     out.push_str(&format!(
         "{} {}\n",
-        colorize(";; recursive avail:", &text_color),
+        colorize(";; recursive avail:", text_color),
         msg.header.ra
     ));
     out.push_str(&format!(
         "{} {:?}\n",
-        colorize(";; status         :", &text_color),
+        colorize(";; status         :", text_color),
         msg.header.rcode
     ));
 
     out.push('\n');
 
-    out.push_str(&colorize(";; ANSWERS\n", &text_color));
+    out.push_str(&colorize(";; ANSWERS\n", text_color));
     for rr in &msg.answers {
         out.push_str(&format_resource_record(rr));
     }
 
-    out.push_str(&colorize(";; AUTHORITIES\n", &text_color));
+    out.push_str(&colorize(";; AUTHORITIES\n", text_color));
     for rr in &msg.authorities {
         out.push_str(&format_resource_record(rr));
     }
 
-    out.push_str(&colorize(";; ADDITIONALS\n", &text_color));
+    out.push_str(&colorize(";; ADDITIONALS\n", text_color));
     for rr in &msg.additionals {
         out.push_str(&format_resource_record(rr));
     }
@@ -179,6 +179,7 @@ pub fn format_response(msg: &DnsMessage) -> String {
 }
 
 #[allow(dead_code)] // reserved for future color usage
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Color {
     Black,
     Blue,
@@ -191,7 +192,7 @@ enum Color {
     None,
 }
 
-fn colorize(s: &str, c: &Color) -> String {
+fn colorize(s: &str, c: Color) -> String {
     match c {
         Color::Black => format!("{}", s.black()),
         Color::Blue => format!("{}", s.blue()),

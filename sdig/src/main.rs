@@ -163,6 +163,14 @@ where
                 out.qtype = DnsType::NS;
                 continue;
             }
+            "ptr" => {
+                out.qtype = DnsType::PTR;
+                continue;
+            }
+            "soa" => {
+                out.qtype = DnsType::SOA;
+                continue;
+            }
             "in" => {
                 out.qclass = DnsClass::Internet;
                 continue;
